@@ -33,6 +33,11 @@ import type {
 } from './types/crypto';
 
 export function App() {
+  // Visitor and Auth State - Like Netflix, if user is already logged in, skip auth!
+  const [hasVisitedBefore, setHasVisitedBefore] = useState<boolean>(() => {
+    return localStorage.getItem('cryptonex_visited') === 'true';
+  });
+
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(() => {
     const saved = localStorage.getItem('cryptonex_user');
     if (saved) {
@@ -45,8 +50,12 @@ export function App() {
     return null;
   });
 
-  // Flow State Machine ALWAYS starts at 'intro' for everyone (first visit or 100th visit!)
-  const [flowState, setFlowState] = useState<'intro' | 'auth' | 'dashboard'>('intro');
+  // Flow State Machine: If user is logged in, take them STRAIGHT TO HOME PAGE / DASHBOARD like Netflix!
+  const [flowState, setFlowState] = useState<'intro' | 'auth' | 'dashboard'>(() => {
+    const savedUser = localStorage.getItem('cryptonex_user');
+    if (savedUser) return 'dashboard';
+    return 'intro';
+  });
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('BTC');
@@ -135,6 +144,8 @@ export function App() {
   }, [whaleAssetFilter]);
 
   const handleIntroContinue = () => {
+    localStorage.setItem('cryptonex_visited', 'true');
+    setHasVisitedBefore(true);
     if (user) {
       setFlowState('dashboard');
     } else {
@@ -145,6 +156,7 @@ export function App() {
   const handleAuthSuccess = (userData: { name: string; email: string; role: string }) => {
     setUser(userData);
     localStorage.setItem('cryptonex_user', JSON.stringify(userData));
+    localStorage.setItem('cryptonex_visited', 'true');
     setFlowState('dashboard');
   };
 
@@ -152,6 +164,10 @@ export function App() {
     setUser(null);
     localStorage.removeItem('cryptonex_user');
     setFlowState('auth');
+  };
+
+  const handleReplayIntro = () => {
+    setFlowState('intro');
   };
 
   const handleSelectAsset = (symbol: string) => {
@@ -191,7 +207,7 @@ export function App() {
     return (
       <CinematicIntro
         onContinue={handleIntroContinue}
-        isReturningVisitor={false}
+        isReturningVisitor={hasVisitedBefore}
       />
     );
   }
@@ -225,6 +241,7 @@ export function App() {
           onCurrencyChange={setCurrency}
           user={user}
           onLogout={handleLogout}
+          onReplayIntro={handleReplayIntro}
         />
 
         <main className="p-6 space-y-6 flex-1 max-w-7xl w-full mx-auto">
