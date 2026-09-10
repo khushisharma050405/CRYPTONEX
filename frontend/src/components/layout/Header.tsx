@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  const currencies: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'BTC'];
+  const currencies: Currency[] = ['USD', 'INR', 'EUR', 'GBP', 'JPY', 'BTC'];
 
   const filteredAssets = topAssets.filter(
     (a) =>

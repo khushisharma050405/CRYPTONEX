@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: cryptonex-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m backend.run_backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0

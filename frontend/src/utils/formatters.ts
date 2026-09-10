@@ -2,6 +2,7 @@ import type { Currency } from '../types/crypto';
 
 const CURRENCY_CONFIG: Record<Currency, { rate: number; symbol: string; decimals: number }> = {
   USD: { rate: 1.0, symbol: '$', decimals: 2 },
+  INR: { rate: 86.5, symbol: '₹', decimals: 2 },
   EUR: { rate: 0.92, symbol: '€', decimals: 2 },
   GBP: { rate: 0.78, symbol: '£', decimals: 2 },
   JPY: { rate: 154.0, symbol: '¥', decimals: 0 },

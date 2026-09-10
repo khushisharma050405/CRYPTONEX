@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { PortfolioSummary } from '../../types/crypto';
+import type { PortfolioSummary, Currency } from '../../types/crypto';
+import { formatCurrency } from '../../utils/formatters';
 import { MonteCarloCard } from './MonteCarloCard';
 import {
   Plus,
@@ -26,12 +27,14 @@ interface PortfolioViewProps {
   portfolio: PortfolioSummary | null;
   onAddHolding: (symbol: string, quantity: number, price: number) => void;
   onDeleteHolding: (id: string) => void;
+  currency?: Currency;
 }
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({
   portfolio,
   onAddHolding,
-  onDeleteHolding
+  onDeleteHolding,
+  currency = 'USD'
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSymbol, setNewSymbol] = useState('SOL');
@@ -76,7 +79,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         <div className="fintech-card p-5 space-y-1 font-mono">
           <span className="text-xs text-slate-400">TOTAL PORTFOLIO VALUE</span>
           <div className="text-2xl font-black text-slate-100">
-            ${total_value_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {formatCurrency(total_value_usd, currency)}
           </div>
           <span className="text-[10px] text-slate-500 block">Live Market Valuation</span>
         </div>
@@ -85,7 +88,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         <div className="fintech-card p-5 space-y-1 font-mono">
           <span className="text-xs text-slate-400">INVESTED CAPITAL</span>
           <div className="text-2xl font-black text-slate-300">
-            ${total_invested_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {formatCurrency(total_invested_usd, currency)}
           </div>
           <span className="text-[10px] text-slate-500 block">Total Cost Basis</span>
         </div>
@@ -96,7 +99,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
           <div className={`text-2xl font-black flex items-center gap-1 ${isProfitable ? 'text-emerald-400' : 'text-rose-400'}`}>
             {isProfitable ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
             {isProfitable ? '+' : ''}
-            ${Math.abs(total_profit_loss_usd).toLocaleString()} ({isProfitable ? '+' : ''}
+            {formatCurrency(total_profit_loss_usd, currency)} ({isProfitable ? '+' : ''}
             {total_profit_loss_pct.toFixed(2)}%)
           </div>
           <span className="text-[10px] text-slate-500 block">All-Time ROI</span>
@@ -268,11 +271,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                   <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-100">{item.asset_name} ({item.symbol})</td>
                     <td className="py-3.5 px-4 text-right text-slate-200">{item.quantity}</td>
-                    <td className="py-3.5 px-4 text-right text-slate-300">${item.purchase_price_usd.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-right text-slate-100 font-bold">${item.current_price_usd.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-right font-bold text-cyan-400">${item.current_value_usd.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-right text-slate-300">{formatCurrency(item.purchase_price_usd, currency)}</td>
+                    <td className="py-3.5 px-4 text-right text-slate-100 font-bold">{formatCurrency(item.current_price_usd, currency)}</td>
+                    <td className="py-3.5 px-4 text-right font-bold text-cyan-400">{formatCurrency(item.current_value_usd, currency)}</td>
                     <td className={`py-3.5 px-4 text-right font-bold ${pos ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {pos ? '+' : ''}${item.profit_loss_usd.toLocaleString()} ({pos ? '+' : ''}{item.profit_loss_pct}%)
+                      {pos ? '+' : ''}{formatCurrency(item.profit_loss_usd, currency)} ({pos ? '+' : ''}{item.profit_loss_pct}%)
                     </td>
                     <td className="py-3.5 px-4 text-right text-slate-300">{item.allocation_pct}%</td>
                     <td className="py-3.5 px-4 text-center">

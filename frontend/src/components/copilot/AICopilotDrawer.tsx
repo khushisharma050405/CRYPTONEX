@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { CopilotMessage } from '../../types/crypto';
 import { cryptoApi } from '../../services/api';
 import { BrainCircuit, X, Send, Sparkles, User, Bot, RefreshCcw } from 'lucide-react';
@@ -24,13 +24,25 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const promptChips = [
     `Why is ${selectedSymbol} moving today?`,
     `Analyze ${selectedSymbol} technical indicators`,
     `What is the FinBERT sentiment?`,
+    `7-day ML price prediction for ${selectedSymbol}`,
     `Evaluate portfolio risk & VaR`
   ];
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+    }
+  }, [messages, isThinking, isOpen]);
 
   const handleSend = async (promptText: string) => {
     if (!promptText.trim()) return;
@@ -49,16 +61,74 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
       const response = await cryptoApi.chatWithCopilot(promptText, selectedSymbol);
       setMessages((prev) => [...prev, response]);
     } catch (err) {
-      console.error(err);
+      console.error("Copilot Chat Error:", err);
+      const fallbackMsg: CopilotMessage = {
+        sender: 'copilot',
+        text: `⚠️ Unable to connect to AI Copilot service. Please verify backend connection.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
       setIsThinking(false);
     }
   };
 
+  // Inline Formatter for markdown syntax (bold **text**, bullets • / -, section headers)
+  const renderFormattedText = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map((line, lIdx) => {
+      // Split on bold syntax **...**
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      const lineContent = parts.map((part, pIdx) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={pIdx} className="font-semibold text-cyan-300">
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return part;
+      });
+
+      const isHeader =
+        line.startsWith('📊 ') ||
+        line.startsWith('⚡ ') ||
+        line.startsWith('🧠 ') ||
+        line.startsWith('🔮 ') ||
+        line.startsWith('🐋 ') ||
+        line.startsWith('🛡️ ') ||
+        line.startsWith('🎯 ') ||
+        line.startsWith('🤖 ');
+
+      if (isHeader) {
+        return (
+          <div key={lIdx} className="font-bold text-slate-100 mt-2 mb-1.5 text-xs tracking-wide">
+            {lineContent}
+          </div>
+        );
+      }
+
+      if (line.trim().startsWith('• ') || line.trim().startsWith('- ')) {
+        return (
+          <div key={lIdx} className="flex items-start gap-1.5 ml-1.5 my-1">
+            <span className="text-cyan-400 font-bold">•</span>
+            <span className="flex-1 leading-relaxed">{lineContent}</span>
+          </div>
+        );
+      }
+
+      return (
+        <div key={lIdx} className={line.trim() === '' ? 'h-2' : 'my-0.5 leading-relaxed'}>
+          {lineContent}
+        </div>
+      );
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-[#0F141C] border-l border-slate-800 shadow-2xl z-50 flex flex-col justify-between font-sans">
+    <div className="fixed inset-y-0 right-0 w-full sm:w-[460px] bg-[#0F141C] border-l border-slate-800 shadow-2xl z-50 flex flex-col justify-between font-sans">
       {/* Header */}
       <div className="p-4 border-b border-slate-800/80 flex items-center justify-between bg-[#121721]">
         <div className="flex items-center gap-3">
@@ -67,13 +137,17 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
           </div>
           <div>
             <h3 className="font-bold text-sm text-slate-100 font-mono">CRYPTONEX AI Copilot</h3>
-            <span className="text-[10px] text-cyan-400 font-mono">Context: {selectedSymbol} Intelligence</span>
+            <span className="text-[10px] text-cyan-400 font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Context: {selectedSymbol} Intelligence
+            </span>
           </div>
         </div>
 
         <button
           onClick={onClose}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          title="Close Copilot"
         >
           <X className="w-5 h-5" />
         </button>
@@ -97,14 +171,14 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
             </div>
 
             <div
-              className={`max-w-[85%] p-3.5 rounded-xl space-y-1 ${
+              className={`max-w-[88%] p-3.5 rounded-xl space-y-1 ${
                 msg.sender === 'user'
                   ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-100 rounded-tr-none'
-                  : 'bg-[#161C27] border border-slate-800 text-slate-200 rounded-tl-none'
+                  : 'bg-[#161C27] border border-slate-800 text-slate-200 rounded-tl-none shadow-sm'
               }`}
             >
-              <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
-              <span className="text-[9px] text-slate-500 block text-right">{msg.timestamp}</span>
+              <div>{renderFormattedText(msg.text)}</div>
+              <span className="text-[9px] text-slate-500 block text-right pt-1">{msg.timestamp}</span>
             </div>
           </div>
         ))}
@@ -112,9 +186,10 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
         {isThinking && (
           <div className="flex items-center gap-2 text-slate-400 text-xs font-mono p-2">
             <RefreshCcw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-            <span>AI Copilot analyzing metrics...</span>
+            <span>AI Copilot analyzing multi-factor metrics...</span>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Prompt Chips & Input Bar */}
@@ -124,9 +199,9 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
             <button
               key={idx}
               onClick={() => handleSend(chip)}
-              className="px-2.5 py-1 rounded-full bg-[#161C27] border border-slate-800 hover:border-cyan-500/50 text-[10px] text-slate-300 font-mono whitespace-nowrap transition-colors"
+              className="px-2.5 py-1 rounded-full bg-[#161C27] border border-slate-800 hover:border-cyan-500/50 text-[10px] text-slate-300 font-mono whitespace-nowrap transition-colors flex items-center gap-1"
             >
-              <Sparkles className="w-3 h-3 inline mr-1 text-cyan-400" />
+              <Sparkles className="w-3 h-3 text-cyan-400" />
               {chip}
             </button>
           ))}
@@ -144,12 +219,12 @@ export const AICopilotDrawer: React.FC<AICopilotDrawerProps> = ({
             placeholder={`Ask Copilot about ${selectedSymbol}...`}
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
-            className="flex-1 bg-[#161C27] border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+            className="flex-1 bg-[#161C27] border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono placeholder:text-slate-500"
           />
           <button
             type="submit"
             disabled={!inputPrompt.trim() || isThinking}
-            className="p-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold disabled:opacity-50 transition-all"
+            className="p-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold disabled:opacity-50 transition-all shadow-md shadow-cyan-500/20"
           >
             <Send className="w-4 h-4" />
           </button>

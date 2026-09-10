@@ -223,4 +223,4 @@ export interface OrderBookLiquidation {
   sentiment_bias: string;
 }
 
-export type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'BTC';
+export type Currency = 'USD' | 'INR' | 'EUR' | 'GBP' | 'JPY' | 'BTC';
