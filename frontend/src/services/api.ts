@@ -15,12 +15,20 @@ import type {
   OrderBookLiquidation
 } from '../types/crypto';
 
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
 
 export const cryptoApi = {
   getMarketOverview: async (): Promise<MarketOverview> => {
