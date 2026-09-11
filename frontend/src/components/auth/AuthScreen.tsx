@@ -1,30 +1,12 @@
 import React, { useState } from 'react';
 import { CryptonexLogo } from '../logo/CryptonexLogo';
 import { Mail, Lock, User, ArrowRight, CheckCircle, Wallet, X, KeyRound, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
+import { cryptoApi } from '../../services/api';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: { name: string; email: string; role: string }) => void;
   initialMode?: 'login' | 'signup';
 }
-
-const getRegisteredUsers = () => {
-  const saved = localStorage.getItem('cryptonex_registered_users');
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return {};
-    }
-  }
-  return {
-    'trader@cryptonex.ai': {
-      name: 'Alex Mercer',
-      email: 'trader@cryptonex.ai',
-      password: 'password123',
-      role: 'Institutional Pro'
-    }
-  };
-};
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMode = 'login' }) => {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
@@ -49,53 +31,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
 
   const [loading, setLoading] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     setLoading(true);
 
-    const emailClean = loginEmail.toLowerCase().trim();
-    
-    setTimeout(() => {
-      const users = getRegisteredUsers();
-      const existingUser = users[emailClean];
-
-      if (existingUser) {
-        if (existingUser.password !== loginPassword) {
-          setLoginError('Invalid password. Please check your credentials.');
-          setLoading(false);
-          return;
-        }
-        
+    try {
+      const res = await cryptoApi.login(loginEmail, loginPassword);
+      if (res?.user) {
         onAuthSuccess({
-          name: existingUser.name,
-          email: existingUser.email,
-          role: existingUser.role || 'Pro Member'
-        });
-      } else {
-        // Auto register & log in clean credentials
-        const emailName = loginEmail ? loginEmail.split('@')[0] : 'Trader';
-        const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
-        const newUser = {
-          name: formattedName,
-          email: emailClean,
-          password: loginPassword,
-          role: 'Pro Member'
-        };
-        users[emailClean] = newUser;
-        localStorage.setItem('cryptonex_registered_users', JSON.stringify(users));
-
-        onAuthSuccess({
-          name: formattedName,
-          email: emailClean,
-          role: 'Pro Member'
+          name: res.user.name,
+          email: res.user.email,
+          role: res.user.role || 'Pro Member'
         });
       }
+    } catch (err: any) {
+      setLoginError(err?.response?.data?.detail || 'Invalid email or password.');
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupError(null);
 
@@ -110,27 +67,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const users = getRegisteredUsers();
-      const userKey = signupEmail.toLowerCase().trim();
-
-      const newUser = {
-        name: fullName || 'Crypto Trader',
-        email: userKey,
-        password: signupPassword,
-        role: 'Pro Member'
-      };
-
-      users[userKey] = newUser;
-      localStorage.setItem('cryptonex_registered_users', JSON.stringify(users));
-
-      onAuthSuccess({
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role
-      });
+    try {
+      const res = await cryptoApi.register(fullName || 'Trader', signupEmail, signupPassword);
+      if (res?.user) {
+        onAuthSuccess({
+          name: res.user.name,
+          email: res.user.email,
+          role: res.user.role || 'Pro Member'
+        });
+      }
+    } catch (err: any) {
+      setSignupError(err?.response?.data?.detail || 'Registration failed. Please check your details.');
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   const handleQuickFill = () => {
@@ -138,13 +88,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
     setLoginPassword('password123');
   };
 
-  const handleDemoAccess = () => {
-    onAuthSuccess({
-      name: 'Alex Mercer',
-      email: 'alex.mercer@cryptonex.ai',
-      role: 'Institutional Pro'
-    });
+  const handleDemoAccess = async () => {
+    setLoading(true);
+    try {
+      const res = await cryptoApi.getDemoUser();
+      onAuthSuccess({
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role || 'Institutional Pro'
+      });
+    } catch {
+      onAuthSuccess({
+        name: 'Alex Mercer',
+        email: 'alex.mercer@cryptonex.ai',
+        role: 'Institutional Pro'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const handleResetSubmit = (e: React.FormEvent) => {
     e.preventDefault();

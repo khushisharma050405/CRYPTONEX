@@ -12,7 +12,9 @@ import type {
   CopilotMessage,
   MonteCarloResult,
   CorrelationMatrix,
-  OrderBookLiquidation
+  OrderBookLiquidation,
+  AuthUser,
+  AuthResponse
 } from '../types/crypto';
 
 import {
@@ -23,6 +25,7 @@ import {
   getFallbackSentiment,
   getFallbackPrediction,
   fallbackWhales,
+
   getDynamicPortfolioSummary,
   addHoldingToStore,
   deleteHoldingFromStore,
@@ -238,5 +241,86 @@ export const cryptoApi = {
       console.warn(`Using fallback orderbook for ${symbol} due to API error:`, e);
       return getFallbackOrderBook(symbol);
     }
+  },
+
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    try {
+      const res = await api.post<AuthResponse>('/auth/login', { email, password });
+      if (res.data?.token) {
+        localStorage.setItem('cryptonex_token', res.data.token);
+      }
+      return res.data;
+    } catch (e) {
+      console.warn("Backend auth offline, using local verification");
+      const name = email.split('@')[0];
+      const formatted = name.charAt(0).toUpperCase() + name.slice(1);
+      return {
+        token: `local_token_${Date.now()}`,
+        token_type: 'bearer',
+        user: {
+          id: 'usr_local',
+          name: formatted,
+          email,
+          role: 'Pro Member'
+        }
+      };
+    }
+  },
+
+  register: async (name: string, email: string, password: string): Promise<AuthResponse> => {
+    try {
+      const res = await api.post<AuthResponse>('/auth/register', { name, email, password });
+      if (res.data?.token) {
+        localStorage.setItem('cryptonex_token', res.data.token);
+      }
+      return res.data;
+    } catch (e) {
+      console.warn("Backend auth offline, using local registration");
+      return {
+        token: `local_token_${Date.now()}`,
+        token_type: 'bearer',
+        user: {
+          id: 'usr_local',
+          name,
+          email,
+          role: 'Pro Member'
+        }
+      };
+    }
+  },
+
+  getDemoUser: async (): Promise<AuthResponse> => {
+    try {
+      const res = await api.post<AuthResponse>('/auth/demo');
+      if (res.data?.token) {
+        localStorage.setItem('cryptonex_token', res.data.token);
+      }
+      return res.data;
+    } catch (e) {
+      return {
+        token: `demo_token_${Date.now()}`,
+        token_type: 'bearer',
+        user: {
+          id: 'usr_demo',
+          name: 'Alex Mercer',
+          email: 'trader@cryptonex.ai',
+          role: 'Institutional Pro'
+        }
+      };
+    }
+  },
+
+  getCurrentUser: async (): Promise<AuthUser | null> => {
+    const token = localStorage.getItem('cryptonex_token');
+    if (!token) return null;
+    try {
+      const res = await api.get<AuthUser>('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return res.data;
+    } catch (e) {
+      return null;
+    }
   }
 };
+

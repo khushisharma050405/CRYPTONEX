@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import market, technical, sentiment, prediction, whale, portfolio, alerts, copilot, simulation, correlation, orderbook
+from app.api import auth, market, technical, sentiment, prediction, whale, portfolio, alerts, copilot, simulation, correlation, orderbook
 
 app = FastAPI(
     title="CRYPTONEX API",
@@ -16,7 +16,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(market.router)
+
 app.include_router(technical.router)
 app.include_router(sentiment.router)
 app.include_router(prediction.router)

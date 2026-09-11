@@ -224,3 +224,17 @@ export interface OrderBookLiquidation {
 }
 
 export type Currency = 'USD' | 'INR' | 'EUR' | 'GBP' | 'JPY' | 'BTC';
+
+export interface AuthUser {
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  token_type: string;
+  user: AuthUser;
+}
+

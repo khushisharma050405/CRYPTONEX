@@ -205,3 +205,24 @@ class OrderBookLiquidationDTO(BaseModel):
     short_liquidations_24h_usd: float
     bid_ask_ratio: float
     sentiment_bias: str
+
+class UserDTO(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str = "Pro Member"
+
+class LoginRequestDTO(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequestDTO(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class AuthResponseDTO(BaseModel):
+    token: str
+    token_type: str = "bearer"
+    user: UserDTO
+
