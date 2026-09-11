@@ -1,11 +1,30 @@
 import React, { useState } from 'react';
 import { CryptonexLogo } from '../logo/CryptonexLogo';
-import { Mail, Lock, User, ArrowRight, CheckCircle, Wallet, X, KeyRound, LogIn, UserPlus } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, CheckCircle, Wallet, X, KeyRound, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: { name: string; email: string; role: string }) => void;
   initialMode?: 'login' | 'signup';
 }
+
+const getRegisteredUsers = () => {
+  const saved = localStorage.getItem('cryptonex_registered_users');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return {};
+    }
+  }
+  return {
+    'trader@cryptonex.ai': {
+      name: 'Alex Mercer',
+      email: 'trader@cryptonex.ai',
+      password: 'password123',
+      role: 'Institutional Pro'
+    }
+  };
+};
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMode = 'login' }) => {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
@@ -14,6 +33,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Signup form state
   const [fullName, setFullName] = useState('');
@@ -31,17 +51,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     setLoading(true);
 
-    const emailName = loginEmail ? loginEmail.split('@')[0] : 'Trader';
-    const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
-
+    const emailClean = loginEmail.toLowerCase().trim();
+    
     setTimeout(() => {
-      onAuthSuccess({
-        name: formattedName,
-        email: loginEmail || 'user@cryptonex.ai',
-        role: 'Pro Member'
-      });
+      const users = getRegisteredUsers();
+      const existingUser = users[emailClean];
+
+      if (existingUser) {
+        if (existingUser.password !== loginPassword) {
+          setLoginError('Invalid password. Please check your credentials.');
+          setLoading(false);
+          return;
+        }
+        
+        onAuthSuccess({
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role || 'Pro Member'
+        });
+      } else {
+        // Auto register & log in clean credentials
+        const emailName = loginEmail ? loginEmail.split('@')[0] : 'Trader';
+        const formattedName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+        const newUser = {
+          name: formattedName,
+          email: emailClean,
+          password: loginPassword,
+          role: 'Pro Member'
+        };
+        users[emailClean] = newUser;
+        localStorage.setItem('cryptonex_registered_users', JSON.stringify(users));
+
+        onAuthSuccess({
+          name: formattedName,
+          email: emailClean,
+          role: 'Pro Member'
+        });
+      }
       setLoading(false);
     }, 400);
   };
@@ -55,15 +104,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
       return;
     }
 
+    if (signupPassword.length < 4) {
+      setSignupError('Password must be at least 4 characters long.');
+      return;
+    }
+
     setLoading(true);
     setTimeout(() => {
+      const users = getRegisteredUsers();
+      const userKey = signupEmail.toLowerCase().trim();
+
+      const newUser = {
+        name: fullName || 'Crypto Trader',
+        email: userKey,
+        password: signupPassword,
+        role: 'Pro Member'
+      };
+
+      users[userKey] = newUser;
+      localStorage.setItem('cryptonex_registered_users', JSON.stringify(users));
+
       onAuthSuccess({
-        name: fullName || 'New Member',
-        email: signupEmail || 'trader@cryptonex.ai',
-        role: 'Standard Member'
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role
       });
       setLoading(false);
     }, 400);
+  };
+
+  const handleQuickFill = () => {
+    setLoginEmail('trader@cryptonex.ai');
+    setLoginPassword('password123');
   };
 
   const handleDemoAccess = () => {
@@ -104,7 +176,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
           </h2>
           <p className="text-xs text-slate-400 font-sans">
             {mode === 'login'
-              ? 'Enter your account details to access the terminal.'
+              ? 'Enter your account credentials to access the AI intelligence terminal.'
               : 'Unlock AI predictions, FinBERT sentiment, and Monte Carlo risk analytics.'}
           </p>
         </div>
@@ -113,7 +185,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
         <div className="flex bg-[#161C27] p-1 rounded-xl border border-slate-800 text-xs font-mono">
           <button
             type="button"
-            onClick={() => setMode('login')}
+            onClick={() => {
+              setMode('login');
+              setLoginError(null);
+            }}
             className={`flex-1 py-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all ${
               mode === 'login' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -123,7 +198,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
           </button>
           <button
             type="button"
-            onClick={() => setMode('signup')}
+            onClick={() => {
+              setMode('signup');
+              setSignupError(null);
+            }}
             className={`flex-1 py-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all ${
               mode === 'signup' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -136,6 +214,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
         {/* LOGIN FORM MODE */}
         {mode === 'login' && (
           <form onSubmit={handleLoginSubmit} className="space-y-4 font-mono">
+            {loginError && (
+              <div className="p-3 rounded-lg bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                <span>{loginError}</span>
+              </div>
+            )}
+
             <div>
               <label className="text-xs text-slate-400 block mb-1.5" htmlFor="login-email">
                 Email Address
@@ -172,6 +256,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
               </div>
             </div>
 
+            {/* Quick Credentials Info Box */}
+            <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between text-[11px] font-sans text-cyan-300">
+              <div className="space-y-0.5 font-mono">
+                <div className="font-bold flex items-center gap-1 text-cyan-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  Default Pro Credentials
+                </div>
+                <div className="text-[10px] text-slate-400">trader@cryptonex.ai / password123</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleQuickFill}
+                className="px-2.5 py-1 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 font-mono text-[10px] font-bold transition-all"
+              >
+                Auto Fill
+              </button>
+            </div>
+
             {/* Remember Me & Forgot Password Row */}
             <div className="flex items-center justify-between text-xs font-sans text-slate-400">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -181,7 +283,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0"
                 />
-                <span>Remember me</span>
+                <span>Remember session</span>
               </label>
 
               <button
@@ -202,43 +304,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
               disabled={loading}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
             >
-              {loading ? 'Logging In...' : 'Log In to Terminal'}
+              {loading ? 'Authenticating...' : 'Sign In to Terminal'}
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            {/* Google Sign In Button */}
-            <button
-              type="button"
-              onClick={handleDemoAccess}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#161C27] border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center gap-2.5 transition-all"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.4 8.8 5 12 5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.3 14.7c-.2-.7-.4-1.5-.4-2.35s.2-1.65.4-2.35L1.6 7.1C.6 9.1 0 10.5 0 12.35s.6 3.25 1.6 5.25l3.7-2.9z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.2 0-5.8-2.4-6.7-5.3L1.6 16C3.5 19.8 7.4 23 12 23z"
-                />
-              </svg>
-              <span>Sign In with Google</span>
-            </button>
-
             {/* Bottom Footer Switcher */}
-            <div className="text-center pt-2 text-xs font-sans text-slate-400">
+            <div className="text-center pt-1 text-xs font-sans text-slate-400">
               Don't have an account?{' '}
               <button
                 type="button"
-                onClick={() => setMode('signup')}
+                onClick={() => {
+                  setMode('signup');
+                  setSignupError(null);
+                }}
                 className="text-cyan-400 font-semibold font-mono hover:underline ml-1"
               >
                 Create Account
@@ -276,7 +354,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
 
             <div>
               <label className="text-xs text-slate-400 block mb-1" htmlFor="signup-email">
-                Email Address
+                Work Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -333,7 +411,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
               disabled={loading}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-500/20 pt-3"
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? 'Registering Account...' : 'Create Account & Sign In'}
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -342,7 +420,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
               Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => {
+                  setMode('login');
+                  setLoginError(null);
+                }}
                 className="text-cyan-400 font-semibold font-mono hover:underline ml-1"
               >
                 Sign In
@@ -359,7 +440,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
             className="w-full py-2 px-3 rounded-lg bg-cyan-950/60 border border-cyan-800/50 hover:bg-cyan-900/60 text-cyan-300 text-[11px] font-mono flex items-center justify-center gap-2 transition-colors"
           >
             <Wallet className="w-3.5 h-3.5 text-cyan-400" />
-            Try Demo Mode (Instant Login)
+            1-Click Institutional Pro Access
           </button>
         </div>
       </div>
@@ -384,7 +465,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialMo
               <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs space-y-2">
                 <div className="flex items-center gap-2 font-bold">
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  Password Reset Instructions Sent
+                  Password Reset Link Dispatched
                 </div>
                 <p className="text-[11px] text-emerald-400 leading-relaxed font-sans">
                   We have dispatched a password reset authorization link to <strong>{resetEmail || 'your email'}</strong>. Please check your inbox.

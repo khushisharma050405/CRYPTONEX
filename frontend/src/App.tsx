@@ -45,8 +45,12 @@ export function App() {
     return null;
   });
 
-  // Flow State Machine ALWAYS starts at 'intro' for everyone (first visit or 100th visit!)
-  const [flowState, setFlowState] = useState<'intro' | 'auth' | 'dashboard'>('intro');
+  // Flow State Machine: Authenticated users go straight to Dashboard, new visitors to Auth Login Screen
+  const [flowState, setFlowState] = useState<'intro' | 'auth' | 'dashboard'>(() => {
+    const saved = localStorage.getItem('cryptonex_user');
+    return saved ? 'dashboard' : 'auth';
+  });
+
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('BTC');
