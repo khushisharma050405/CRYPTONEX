@@ -163,28 +163,29 @@ export function App() {
 
   const handleAddHolding = async (symbol: string, qty: number, price: number) => {
     const updated = await cryptoApi.addHolding(symbol, qty, price);
-    setPortfolio(updated);
+    setPortfolio({ ...updated });
   };
 
   const handleDeleteHolding = async (id: string) => {
     const updated = await cryptoApi.deleteHolding(id);
-    setPortfolio(updated);
+    setPortfolio({ ...updated });
   };
 
   const handleCreateAlert = async (symbol: string, cond: string, target: number) => {
     const updated = await cryptoApi.createAlert(symbol, cond, target);
-    setAlerts(updated);
+    setAlerts([...updated]);
   };
 
   const handleToggleAlert = async (id: string) => {
     const updated = await cryptoApi.toggleAlert(id);
-    setAlerts(updated);
+    setAlerts([...updated]);
   };
 
   const handleDeleteAlert = async (id: string) => {
     const updated = await cryptoApi.deleteAlert(id);
-    setAlerts(updated);
+    setAlerts([...updated]);
   };
+
 
   // RENDER FLOW STATES
   if (flowState === 'intro') {

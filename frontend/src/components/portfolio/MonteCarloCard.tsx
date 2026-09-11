@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { MonteCarloResult } from '../../types/crypto';
 import { cryptoApi } from '../../services/api';
 import { Activity } from 'lucide-react';
-import { ResponsiveContainer, ComposedChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export const MonteCarloCard: React.FC = () => {
   const [data, setData] = useState<MonteCarloResult | null>(null);
@@ -54,7 +54,7 @@ export const MonteCarloCard: React.FC = () => {
                     <div className="bg-[#0F141C] border border-slate-700 p-2.5 rounded text-xs text-slate-200 space-y-1">
                       <div className="text-cyan-400 font-bold border-b border-slate-800 pb-1">Day {label} Outcome</div>
                       <div className="text-emerald-400">90th Percentile (Bull): ${d.p90.toLocaleString()}</div>
-                      <div className="text-slate-200">50th Percentile (Median): ${d.p50.toLocaleString()}</div>
+                      <div className="text-cyan-300">50th Percentile (Median): ${d.p50.toLocaleString()}</div>
                       <div className="text-rose-400">10th Percentile (Bear): ${d.p10.toLocaleString()}</div>
                     </div>
                   );
@@ -64,6 +64,9 @@ export const MonteCarloCard: React.FC = () => {
             />
             <Area type="monotone" dataKey="p90" stroke="none" fill="#10B981" fillOpacity={0.15} />
             <Area type="monotone" dataKey="p10" stroke="none" fill="#0B0E14" fillOpacity={0.9} />
+            <Line type="monotone" dataKey="p90" stroke="#10B981" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
+            <Line type="monotone" dataKey="p50" stroke="#00F2FE" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="p10" stroke="#EF4444" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

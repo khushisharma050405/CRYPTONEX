@@ -23,10 +23,16 @@ import {
   getFallbackSentiment,
   getFallbackPrediction,
   fallbackWhales,
-  fallbackPortfolio,
-  fallbackAlerts,
+  getDynamicPortfolioSummary,
+  addHoldingToStore,
+  deleteHoldingFromStore,
+  getDynamicAlerts,
+  createAlertInStore,
+  toggleAlertInStore,
+  deleteAlertFromStore,
   fallbackCorrelation,
   getFallbackOrderBook,
+  getFallbackMonteCarlo,
   getFallbackCopilot
 } from './mockData';
 
@@ -71,8 +77,8 @@ export const cryptoApi = {
       const res = await api.get<Candle[]>(`/market/candles/${symbol}?timeframe=${timeframe}`);
       return res.data;
     } catch (e) {
-      console.warn(`Using fallback candles for ${symbol} due to API error:`, e);
-      return getFallbackCandles(symbol);
+      console.warn(`Using fallback candles for ${symbol} (${timeframe}) due to API error:`, e);
+      return getFallbackCandles(symbol, timeframe);
     }
   },
 
@@ -122,7 +128,7 @@ export const cryptoApi = {
       return res.data;
     } catch (e) {
       console.warn("Using fallback portfolio due to API error:", e);
-      return fallbackPortfolio;
+      return getDynamicPortfolioSummary();
     }
   },
 
@@ -135,8 +141,8 @@ export const cryptoApi = {
       });
       return res.data;
     } catch (e) {
-      console.warn("Fallback add holding");
-      return fallbackPortfolio;
+      console.warn("Using reactive store add holding fallback");
+      return addHoldingToStore(symbol, quantity, purchasePrice);
     }
   },
 
@@ -145,8 +151,8 @@ export const cryptoApi = {
       const res = await api.delete<PortfolioSummary>(`/portfolio/holdings/${holdingId}`);
       return res.data;
     } catch (e) {
-      console.warn("Fallback delete holding");
-      return fallbackPortfolio;
+      console.warn("Using reactive store delete holding fallback");
+      return deleteHoldingFromStore(holdingId);
     }
   },
 
@@ -156,7 +162,7 @@ export const cryptoApi = {
       return res.data;
     } catch (e) {
       console.warn("Using fallback alerts due to API error:", e);
-      return fallbackAlerts;
+      return getDynamicAlerts();
     }
   },
 
@@ -169,8 +175,8 @@ export const cryptoApi = {
       });
       return res.data;
     } catch (e) {
-      console.warn("Fallback create alert");
-      return fallbackAlerts;
+      console.warn("Using reactive store create alert fallback");
+      return createAlertInStore(asset_symbol, condition, target_price);
     }
   },
 
@@ -179,8 +185,8 @@ export const cryptoApi = {
       const res = await api.put<PriceAlert[]>(`/alerts/${alertId}/toggle`);
       return res.data;
     } catch (e) {
-      console.warn("Fallback toggle alert");
-      return fallbackAlerts;
+      console.warn("Using reactive store toggle alert fallback");
+      return toggleAlertInStore(alertId);
     }
   },
 
@@ -189,8 +195,8 @@ export const cryptoApi = {
       const res = await api.delete<PriceAlert[]>(`/alerts/${alertId}`);
       return res.data;
     } catch (e) {
-      console.warn("Fallback delete alert");
-      return fallbackAlerts;
+      console.warn("Using reactive store delete alert fallback");
+      return deleteAlertFromStore(alertId);
     }
   },
 
@@ -209,20 +215,8 @@ export const cryptoApi = {
       const res = await api.get<MonteCarloResult>(`/simulation/monte-carlo?iterations=${iterations}&days=${days}`);
       return res.data;
     } catch (e) {
-      console.warn("Fallback Monte Carlo simulation");
-      return {
-        iterations,
-        days_horizon: days,
-        initial_value_usd: 124850.50,
-        expected_value_usd: 138500.00,
-        var_95_usd: 9400.00,
-        var_95_pct: 7.5,
-        percentiles_path: [
-          { day: 1, p10: 122000, p50: 125000, p90: 128000 },
-          { day: 15, p10: 118000, p50: 131000, p90: 142000 },
-          { day: 30, p10: 115450, p50: 138500, p90: 156000 }
-        ]
-      };
+      console.warn("Using fallback Monte Carlo simulation");
+      return getFallbackMonteCarlo(iterations, days);
     }
   },
 

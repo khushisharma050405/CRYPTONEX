@@ -7,12 +7,13 @@ import type {
   AIPrediction,
   WhaleTransaction,
   PortfolioSummary,
+  PortfolioAsset,
   PriceAlert,
   CopilotMessage,
+  MonteCarloResult,
   CorrelationMatrix,
   OrderBookLiquidation
 } from '../types/crypto';
-
 
 export const fallbackMarketOverview: MarketOverview = {
   total_market_cap_usd: 2684900000000,
@@ -209,19 +210,59 @@ export const fallbackTopCryptos: CryptoAsset[] = [
   }
 ];
 
-export const getFallbackCandles = (symbol: string): Candle[] => {
-  const basePrice = symbol === 'BTC' ? 68450 : symbol === 'ETH' ? 3540 : symbol === 'SOL' ? 162 : 50;
+export const getFallbackCandles = (symbol: string, timeframe: string = '1D'): Candle[] => {
+  const asset = fallbackTopCryptos.find((a) => a.symbol === symbol.toUpperCase());
+  const basePrice = asset ? asset.price_usd : (symbol.toUpperCase() === 'BTC' ? 68450 : 3540);
+  
+  let pointsCount = 30;
+  let intervalMs = 24 * 60 * 60 * 1000;
+  
+  switch (timeframe.toUpperCase()) {
+    case '1H':
+      pointsCount = 24;
+      intervalMs = 60 * 60 * 1000;
+      break;
+    case '1D':
+      pointsCount = 30;
+      intervalMs = 24 * 60 * 60 * 1000;
+      break;
+    case '1W':
+      pointsCount = 28;
+      intervalMs = 6 * 60 * 60 * 1000;
+      break;
+    case '1M':
+      pointsCount = 30;
+      intervalMs = 24 * 60 * 60 * 1000;
+      break;
+    case '3M':
+      pointsCount = 45;
+      intervalMs = 2 * 24 * 60 * 60 * 1000;
+      break;
+    case '1Y':
+    case 'ALL':
+      pointsCount = 52;
+      intervalMs = 7 * 24 * 60 * 60 * 1000;
+      break;
+    default:
+      pointsCount = 30;
+      intervalMs = 24 * 60 * 60 * 1000;
+  }
+
   const result: Candle[] = [];
   const now = new Date();
   
-  for (let i = 30; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const dateStr = d.toISOString().slice(5, 10);
-    const variance = (Math.sin(i * 0.4) * 0.05 + Math.random() * 0.02 - 0.01) * basePrice;
+  for (let i = pointsCount; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * intervalMs);
+    const dateStr = timeframe === '1H'
+      ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : d.toISOString().slice(5, 10);
+      
+    const sinFactor = Math.sin((pointsCount - i) * 0.3);
+    const variance = (sinFactor * 0.04 + ((i % 5) * 0.005) - 0.01) * basePrice;
     const close = Math.round((basePrice + variance) * 100) / 100;
-    const open = Math.round((close + (Math.random() * 0.02 - 0.01) * basePrice) * 100) / 100;
-    const high = Math.max(open, close) + Math.round(Math.random() * 0.01 * basePrice * 100) / 100;
-    const low = Math.min(open, close) - Math.round(Math.random() * 0.01 * basePrice * 100) / 100;
+    const open = Math.round((close + (Math.sin(i) * 0.015) * basePrice) * 100) / 100;
+    const high = Math.max(open, close) + Math.round(0.008 * basePrice * 100) / 100;
+    const low = Math.min(open, close) - Math.round(0.008 * basePrice * 100) / 100;
 
     result.push({
       timestamp: dateStr,
@@ -229,38 +270,42 @@ export const getFallbackCandles = (symbol: string): Candle[] => {
       high,
       low,
       close,
-      volume: Math.round(basePrice * 100000 + Math.random() * 5000000),
-      sma20: Math.round((close * 0.98) * 100) / 100,
-      sma50: Math.round((close * 0.95) * 100) / 100,
-      ema20: Math.round((close * 0.99) * 100) / 100,
-      ema50: Math.round((close * 0.96) * 100) / 100,
-      bb_upper: Math.round((close * 1.05) * 100) / 100,
-      bb_lower: Math.round((close * 0.92) * 100) / 100
+      volume: Math.round(basePrice * 80000 + (Math.abs(sinFactor) * 5000000)),
+      sma20: Math.round((close * 0.982) * 100) / 100,
+      sma50: Math.round((close * 0.954) * 100) / 100,
+      ema20: Math.round((close * 0.988) * 100) / 100,
+      ema50: Math.round((close * 0.961) * 100) / 100,
+      bb_upper: Math.round((close * 1.045) * 100) / 100,
+      bb_lower: Math.round((close * 0.925) * 100) / 100
     });
   }
   return result;
 };
 
-export const getFallbackTechnical = (symbol: string): TechnicalAnalysisResult => ({
-  symbol: symbol.toUpperCase(),
-  current_price: symbol === 'BTC' ? 68450 : 3540,
-  signal: 'BUY',
-  signal_score: 0.68,
-  indicators: {
-    'RSI_14': { name: 'RSI (14)', value: 62.4, interpretation: 'Bullish Momentum', category: 'Oscillator' },
-    'MACD_Line': { name: 'MACD Line', value: 412.5, interpretation: 'Positive Crossover', category: 'Trend' },
-    'SMA_50': { name: 'SMA 50', value: 64200, interpretation: 'Price Above SMA 50', category: 'Moving Average' },
-    'SMA_200': { name: 'SMA 200', value: 58900, interpretation: 'Golden Cross Active', category: 'Moving Average' },
-    'Stoch_K': { name: 'Stochastic %K', value: 74.2, interpretation: 'Neutral-High', category: 'Oscillator' },
-    'ADX': { name: 'ADX (14)', value: 28.5, interpretation: 'Strong Trend Established', category: 'Trend Strength' }
-  },
-  rationale_points: [
-    `RSI (14) at 62.4 confirms sustained buyers strength without reaching overbought levels (>70).`,
-    `MACD histogram exhibits positive divergence above zero line.`,
-    `Price maintains technical structure above 20-day and 50-day exponential moving averages.`
-  ],
-  summary_text: `${symbol.toUpperCase()} exhibits strong bullish technical confluence across multi-timeframe indicators.`
-});
+export const getFallbackTechnical = (symbol: string): TechnicalAnalysisResult => {
+  const asset = fallbackTopCryptos.find((a) => a.symbol === symbol.toUpperCase());
+  const price = asset ? asset.price_usd : 68450;
+  return {
+    symbol: symbol.toUpperCase(),
+    current_price: price,
+    signal: 'BUY',
+    signal_score: 0.68,
+    indicators: {
+      'RSI_14': { name: 'RSI (14)', value: 62.4, interpretation: 'Bullish Momentum', category: 'Oscillator' },
+      'MACD_Line': { name: 'MACD Line', value: price * 0.006, interpretation: 'Positive Crossover', category: 'Trend' },
+      'SMA_50': { name: 'SMA 50', value: price * 0.94, interpretation: 'Price Above SMA 50', category: 'Moving Average' },
+      'SMA_200': { name: 'SMA 200', value: price * 0.86, interpretation: 'Golden Cross Active', category: 'Moving Average' },
+      'Stoch_K': { name: 'Stochastic %K', value: 74.2, interpretation: 'Neutral-High', category: 'Oscillator' },
+      'ADX': { name: 'ADX (14)', value: 28.5, interpretation: 'Strong Trend Established', category: 'Trend Strength' }
+    },
+    rationale_points: [
+      `RSI (14) at 62.4 confirms sustained buyers strength without reaching overbought levels (>70).`,
+      `MACD histogram exhibits positive divergence above zero line.`,
+      `Price maintains technical structure above 20-day and 50-day exponential moving averages.`
+    ],
+    summary_text: `${symbol.toUpperCase()} exhibits strong bullish technical confluence across multi-timeframe indicators.`
+  };
+};
 
 export const getFallbackSentiment = (symbol: string): SentimentIntelligence => ({
   symbol: symbol.toUpperCase(),
@@ -298,7 +343,7 @@ export const getFallbackSentiment = (symbol: string): SentimentIntelligence => (
   social_posts: [
     {
       id: 'soc-1',
-      title: `FinBERT NLP sentiment rating on ${symbol.toUpperCase()} Twitter/X mentions jumped to +0.65`,
+      title: `FinBERT NLP sentiment rating on ${symbol.toUpperCase()} mentions jumped to +0.65`,
       source: 'X Intelligence Scraper',
       timestamp: '5 mins ago',
       coin_symbol: symbol.toUpperCase(),
@@ -316,7 +361,8 @@ export const getFallbackSentiment = (symbol: string): SentimentIntelligence => (
 });
 
 export const getFallbackPrediction = (symbol: string, horizon: string, model: string): AIPrediction => {
-  const current = symbol === 'BTC' ? 68450 : symbol === 'ETH' ? 3540 : 162;
+  const asset = fallbackTopCryptos.find((a) => a.symbol === symbol.toUpperCase());
+  const current = asset ? asset.price_usd : 68450;
   const target = Math.round(current * 1.074 * 100) / 100;
   return {
     symbol: symbol.toUpperCase(),
@@ -375,52 +421,100 @@ export const fallbackWhales: WhaleTransaction[] = [
   }
 ];
 
-export const fallbackPortfolio: PortfolioSummary = {
-  total_value_usd: 124850.50,
-  total_invested_usd: 98000.00,
-  total_profit_loss_usd: 26850.50,
-  total_profit_loss_pct: 27.40,
-  risk_level: 'MEDIUM',
-  volatility_annualized: 38.5,
-  sharpe_ratio: 2.15,
-  max_drawdown_pct: 12.4,
-  holdings: [
-    {
-      id: 'h-1',
-      asset_name: 'Bitcoin',
-      symbol: 'BTC',
-      quantity: 1.25,
-      purchase_price_usd: 54000,
-      purchase_date: '2024-01-15',
-      current_price_usd: 68450,
-      current_value_usd: 85562.50,
-      profit_loss_usd: 18062.50,
-      profit_loss_pct: 26.76,
-      allocation_pct: 68.5
-    },
-    {
-      id: 'h-2',
-      asset_name: 'Ethereum',
-      symbol: 'ETH',
-      quantity: 8.5,
-      purchase_price_usd: 2800,
-      purchase_date: '2024-02-10',
-      current_price_usd: 3540.20,
-      current_value_usd: 30091.70,
-      profit_loss_usd: 6291.70,
-      profit_loss_pct: 26.43,
-      allocation_pct: 24.1
-    }
-  ],
-  performance_history: [
-    { timestamp: 'Jan', portfolio_value: 98000, invested_capital: 98000 },
-    { timestamp: 'Feb', portfolio_value: 104500, invested_capital: 98000 },
-    { timestamp: 'Mar', portfolio_value: 118200, invested_capital: 98000 },
-    { timestamp: 'Today', portfolio_value: 124850.50, invested_capital: 98000 }
-  ]
+// --- DYNAMIC PORTFOLIO STORE ---
+let mutableHoldings: PortfolioAsset[] = [
+  {
+    id: 'h-1',
+    asset_name: 'Bitcoin',
+    symbol: 'BTC',
+    quantity: 1.25,
+    purchase_price_usd: 54000,
+    purchase_date: '2024-01-15',
+    current_price_usd: 68450,
+    current_value_usd: 85562.50,
+    profit_loss_usd: 18062.50,
+    profit_loss_pct: 26.76,
+    allocation_pct: 68.5
+  },
+  {
+    id: 'h-2',
+    asset_name: 'Ethereum',
+    symbol: 'ETH',
+    quantity: 8.5,
+    purchase_price_usd: 2800,
+    purchase_date: '2024-02-10',
+    current_price_usd: 3540.20,
+    current_value_usd: 30091.70,
+    profit_loss_usd: 6291.70,
+    profit_loss_pct: 26.43,
+    allocation_pct: 24.1
+  }
+];
+
+export const getDynamicPortfolioSummary = (): PortfolioSummary => {
+  const total_value_usd = mutableHoldings.reduce((sum, h) => sum + h.current_value_usd, 0);
+  const total_invested_usd = mutableHoldings.reduce((sum, h) => sum + (h.quantity * h.purchase_price_usd), 0);
+  const total_profit_loss_usd = total_value_usd - total_invested_usd;
+  const total_profit_loss_pct = total_invested_usd > 0 ? (total_profit_loss_usd / total_invested_usd) * 100 : 0;
+
+  // Re-calculate allocation percentages
+  mutableHoldings.forEach((h) => {
+    h.allocation_pct = total_value_usd > 0 ? Math.round((h.current_value_usd / total_value_usd) * 1000) / 10 : 0;
+  });
+
+  return {
+    total_value_usd,
+    total_invested_usd,
+    total_profit_loss_usd,
+    total_profit_loss_pct,
+    risk_level: mutableHoldings.length > 3 ? 'LOW' : 'MEDIUM',
+    volatility_annualized: 38.5,
+    sharpe_ratio: 2.15,
+    max_drawdown_pct: 12.4,
+    holdings: [...mutableHoldings],
+    performance_history: [
+      { timestamp: 'Jan', portfolio_value: total_invested_usd, invested_capital: total_invested_usd },
+      { timestamp: 'Feb', portfolio_value: total_invested_usd * 1.05, invested_capital: total_invested_usd },
+      { timestamp: 'Mar', portfolio_value: total_invested_usd * 1.18, invested_capital: total_invested_usd },
+      { timestamp: 'Today', portfolio_value: total_value_usd, invested_capital: total_invested_usd }
+    ]
+  };
 };
 
-export const fallbackAlerts: PriceAlert[] = [
+export const addHoldingToStore = (symbol: string, quantity: number, purchasePrice: number): PortfolioSummary => {
+  const sym = symbol.toUpperCase();
+  const asset = fallbackTopCryptos.find((a) => a.symbol === sym);
+  const currentPrice = asset ? asset.price_usd : purchasePrice;
+  const currentVal = quantity * currentPrice;
+  const invested = quantity * purchasePrice;
+  const pnlUsd = currentVal - invested;
+  const pnlPct = invested > 0 ? (pnlUsd / invested) * 100 : 0;
+
+  const newHolding: PortfolioAsset = {
+    id: `h-${Date.now()}`,
+    asset_name: asset ? asset.name : sym,
+    symbol: sym,
+    quantity,
+    purchase_price_usd: purchasePrice,
+    purchase_date: new Date().toISOString().slice(0, 10),
+    current_price_usd: currentPrice,
+    current_value_usd: currentVal,
+    profit_loss_usd: pnlUsd,
+    profit_loss_pct: Math.round(pnlPct * 100) / 100,
+    allocation_pct: 0
+  };
+
+  mutableHoldings.push(newHolding);
+  return getDynamicPortfolioSummary();
+};
+
+export const deleteHoldingFromStore = (holdingId: string): PortfolioSummary => {
+  mutableHoldings = mutableHoldings.filter((h) => h.id !== holdingId);
+  return getDynamicPortfolioSummary();
+};
+
+// --- DYNAMIC PRICE ALERTS STORE ---
+let mutableAlerts: PriceAlert[] = [
   {
     id: 'alt-1',
     asset_symbol: 'BTC',
@@ -440,6 +534,32 @@ export const fallbackAlerts: PriceAlert[] = [
     created_at: '2026-09-10'
   }
 ];
+
+export const getDynamicAlerts = (): PriceAlert[] => [...mutableAlerts];
+
+export const createAlertInStore = (asset_symbol: string, condition: 'ABOVE' | 'BELOW' | string, target_price: number): PriceAlert[] => {
+  const newAlert: PriceAlert = {
+    id: `alt-${Date.now()}`,
+    asset_symbol: asset_symbol.toUpperCase(),
+    condition: condition.toUpperCase() === 'BELOW' ? 'BELOW' : 'ABOVE',
+    target_price_usd: target_price,
+    active: true,
+    triggered: false,
+    created_at: new Date().toISOString().slice(0, 10)
+  };
+  mutableAlerts = [newAlert, ...mutableAlerts];
+  return [...mutableAlerts];
+};
+
+export const toggleAlertInStore = (alertId: string): PriceAlert[] => {
+  mutableAlerts = mutableAlerts.map((a) => a.id === alertId ? { ...a, active: !a.active } : a);
+  return [...mutableAlerts];
+};
+
+export const deleteAlertFromStore = (alertId: string): PriceAlert[] => {
+  mutableAlerts = mutableAlerts.filter((a) => a.id !== alertId);
+  return [...mutableAlerts];
+};
 
 export const fallbackCorrelation: CorrelationMatrix = {
   symbols: ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA'],
@@ -472,18 +592,82 @@ export const getFallbackOrderBook = (symbol: string): OrderBookLiquidation => ({
   sentiment_bias: 'BULLISH ACCUMULATION'
 });
 
+export const getFallbackMonteCarlo = (iterations: number = 1000, days: number = 30): MonteCarloResult => {
+  const initial = getDynamicPortfolioSummary().total_value_usd || 124850.50;
+  const path = [];
+  
+  for (let i = 1; i <= days; i++) {
+    const growth = 1 + (i * 0.0035);
+    const spread = Math.sqrt(i) * 0.012;
+    path.push({
+      day: i,
+      p10: Math.round(initial * (growth - spread * 1.5)),
+      p50: Math.round(initial * growth),
+      p90: Math.round(initial * (growth + spread * 1.8))
+    });
+  }
+
+  const expected = path[path.length - 1].p50;
+  const varUsd = Math.round(initial - path[path.length - 1].p10);
+  const varPct = Math.round((varUsd / initial) * 1000) / 10;
+
+  return {
+    iterations,
+    days_horizon: days,
+    initial_value_usd: Math.round(initial),
+    expected_value_usd: expected,
+    var_95_usd: varUsd,
+    var_95_pct: varPct,
+    percentiles_path: path
+  };
+};
+
 export const getFallbackCopilot = (prompt: string, symbol: string): CopilotMessage => {
   const cleanPrompt = prompt.toLowerCase();
-  let reply = `🤖 **CRYPTONEX AI Synthesis for ${symbol.toUpperCase()}**\n\n`;
-  if (cleanPrompt.includes('why') || cleanPrompt.includes('moving') || cleanPrompt.includes('price')) {
-    reply += `Current spot price is evaluated at **$68,450.00** (+4.25% 24h) driven by positive institutional ETF inflows and bullish technical momentum.\n\n`;
-  } else if (cleanPrompt.includes('rsi') || cleanPrompt.includes('indicator') || cleanPrompt.includes('technical')) {
-    reply += `Relative Strength Index (RSI 14) is at **62.4** (Bullish). MACD line displays a positive crossover above signal line.\n\n`;
+  const asset = fallbackTopCryptos.find((a) => a.symbol === symbol.toUpperCase());
+  const name = asset ? asset.name : symbol.toUpperCase();
+  const price = asset ? `$${asset.price_usd.toLocaleString()}` : '$68,450.00';
+  const change = asset ? `${asset.change_24h_pct >= 0 ? '+' : ''}${asset.change_24h_pct.toFixed(2)}%` : '+4.25%';
+
+  let reply = `🤖 **CRYPTONEX AI Synthesis for ${name} (${symbol.toUpperCase()})**\n\n`;
+
+  if (cleanPrompt.includes('why') || cleanPrompt.includes('moving') || cleanPrompt.includes('dump') || cleanPrompt.includes('pump') || cleanPrompt.includes('price')) {
+    reply += `**Spot Price**: **${price}** (${change} 24h)\n`;
+    reply += `**Market Catalysts & Drivers**:\n`;
+    reply += `• Institutional net ETF inflows and spot volume expansion ($38.5B 24h volume).\n`;
+    reply += `• FinBERT NLP sentiment rating stands at **BULLISH** (+0.59 score).\n`;
+    reply += `• On-chain metrics confirm net accumulation by top tier 1 whale wallets.\n\n`;
+    reply += `**AI Recommendation**: Maintain exposure above key 20-day moving average support.`;
+  } else if (cleanPrompt.includes('rsi') || cleanPrompt.includes('indicator') || cleanPrompt.includes('technical') || cleanPrompt.includes('macd')) {
+    reply += `⚡ **Technical Indicator Matrix**:\n`;
+    reply += `• **Composite Signal**: **BUY** (Score: +0.68)\n`;
+    reply += `• **Relative Strength Index (RSI 14)**: 62.4 (Bullish Momentum)\n`;
+    reply += `• **MACD Indicator**: Positive Crossover above zero line\n`;
+    reply += `• **SMA 50 / 200**: Golden Cross intact\n\n`;
+    reply += `**Insight**: Multi-timeframe momentum is aligned for upward continuation.`;
+  } else if (cleanPrompt.includes('prediction') || cleanPrompt.includes('predict') || cleanPrompt.includes('forecast') || cleanPrompt.includes('target')) {
+    const targetPrice = asset ? Math.round(asset.price_usd * 1.074) : 73500;
+    reply += `🔮 **7-Day ML Machine Learning Forecast**:\n`;
+    reply += `• **Current Spot Price**: ${price}\n`;
+    reply += `• **7-Day Target**: **$${targetPrice.toLocaleString()}** (+7.4% expected gain)\n`;
+    reply += `• **Model Confidence**: 88.5% (Random Forest Ensemble)\n`;
+    reply += `• **Confidence Bounds**: $${Math.round(targetPrice * 0.94).toLocaleString()} — $${Math.round(targetPrice * 1.08).toLocaleString()}\n`;
+  } else if (cleanPrompt.includes('portfolio') || cleanPrompt.includes('risk') || cleanPrompt.includes('var')) {
+    const p = getDynamicPortfolioSummary();
+    reply += `🛡️ **Portfolio Risk Assessment**:\n`;
+    reply += `• **Total Value**: $${p.total_value_usd.toLocaleString()}\n`;
+    reply += `• **Sharpe Ratio**: ${p.sharpe_ratio} | **Risk Level**: **${p.risk_level}**\n`;
+    reply += `• **95% VaR (30-Day)**: $${p.total_value_usd > 0 ? Math.round(p.total_value_usd * 0.075).toLocaleString() : '9,400'}\n`;
   } else {
-    reply += `Current spot price is evaluated at **$68,450.00** (+4.25% 24h) with strong FinBERT sentiment score (+0.59).\n`;
-    reply += `Key Technical Signal: **BUY** (Composite Score: +0.68). 7-Day Machine Learning Target: **$73,500.00**.\n\n`;
+    reply += `• **Spot Price**: **${price}** (${change} 24h)\n`;
+    reply += `• **Technical Signal**: **BUY** (Score: +0.68)\n`;
+    reply += `• **FinBERT NLP Rating**: **BULLISH** (+0.59)\n`;
+    reply += `• **ML Target**: **$${(asset ? Math.round(asset.price_usd * 1.074) : 73500).toLocaleString()}**\n\n`;
+    reply += `How would you like to proceed? You can ask me:\n`;
+    reply += `• *\"Why is ${symbol} moving today?\"*\n`;
+    reply += `• *\"Show technical RSI and MACD indicators\"*\n`;
+    reply += `• *\"What is the 7-day ML price prediction?\"*`;
   }
-  reply += `Ask me about technical RSI/MACD indicators, FinBERT NLP sentiment, or whale transactions!`;
   
   return {
     sender: 'copilot',
@@ -491,4 +675,3 @@ export const getFallbackCopilot = (prompt: string, symbol: string): CopilotMessa
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
 };
-
