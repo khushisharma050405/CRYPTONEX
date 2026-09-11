@@ -361,32 +361,96 @@ export const getFallbackSentiment = (symbol: string): SentimentIntelligence => (
 });
 
 export const getFallbackPrediction = (symbol: string, horizon: string, model: string): AIPrediction => {
-  const asset = fallbackTopCryptos.find((a) => a.symbol === symbol.toUpperCase());
-  const current = asset ? asset.price_usd : 68450;
-  const target = Math.round(current * 1.074 * 100) / 100;
+  const sym = symbol.toUpperCase();
+  const asset = fallbackTopCryptos.find((a) => a.symbol === sym);
+  const current = asset ? asset.price_usd : (sym === 'BTC' ? 68450 : 3540);
+  
+  const horizonDays = horizon === '1D' ? 1 : horizon === '14D' ? 14 : horizon === '30D' ? 30 : 7;
+  
+  // Model multiplier bias
+  let modelBias = 1.0;
+  if (model.includes('XGBoost')) modelBias = 1.08;
+  if (model.includes('LSTM') || model.includes('Neural')) modelBias = 0.92;
+
+  const baseGainPct = (horizonDays === 1 ? 1.4 : horizonDays === 7 ? 7.4 : horizonDays === 14 ? 12.8 : 21.5) * modelBias;
+  const change_pct = Math.round(baseGainPct * 100) / 100;
+  const pred_price = Math.round(current * (1 + change_pct / 100) * 100) / 100;
+  
+  const std_err = current * (0.015 + (horizonDays * 0.003));
+  const lower_bound = Math.max(0, Math.round((pred_price - (1.96 * std_err)) * 100) / 100);
+  const upper_bound = Math.round((pred_price + (1.96 * std_err)) * 100) / 100;
+  
+  const confidence_pct = model.includes('XGBoost') ? 89.2 : model.includes('LSTM') ? 86.8 : 91.5;
+
+  const forecast_points = [];
+  const now = new Date();
+  
+  // 10 Historical days
+  for (let i = 10; i >= 1; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = d.toISOString().slice(5, 10);
+    const histPrice = Math.round((current * (1 - (i * 0.004) + (Math.sin(i) * 0.008))) * 100) / 100;
+    forecast_points.push({
+      timestamp: dateStr,
+      actual_price: histPrice
+    });
+  }
+
+  // Anchor Today point
+  const todayStr = now.toISOString().slice(5, 10);
+  forecast_points.push({
+    timestamp: todayStr,
+    actual_price: current,
+    predicted_price: current,
+    lower_bound: current,
+    upper_bound: current
+  });
+
+  // Future Forecast days
+  const stepVal = (pred_price - current) / horizonDays;
+  const stepErr = (upper_bound - pred_price) / horizonDays;
+
+  for (let i = 1; i <= horizonDays; i++) {
+    const futureDt = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+    const dateStr = futureDt.toISOString().slice(5, 10);
+    const curPred = Math.round((current + stepVal * i) * 100) / 100;
+    const curLow = Math.max(0, Math.round((current + stepVal * i - stepErr * i) * 100) / 100);
+    const curHigh = Math.round((current + stepVal * i + stepErr * i) * 100) / 100;
+
+    forecast_points.push({
+      timestamp: dateStr,
+      predicted_price: curPred,
+      lower_bound: curLow,
+      upper_bound: curHigh
+    });
+  }
+
+  const model_metrics = [
+    { model_name: 'Random Forest', rmse: Math.round(current * 0.018), mae: Math.round(current * 0.012), r2_score: 0.912, is_best: model === 'Random Forest' },
+    { model_name: 'XGBoost', rmse: Math.round(current * 0.021), mae: Math.round(current * 0.014), r2_score: 0.895, is_best: model === 'XGBoost' },
+    { model_name: 'LSTM / Neural Net', rmse: Math.round(current * 0.025), mae: Math.round(current * 0.017), r2_score: 0.868, is_best: model === 'LSTM / Neural Net' }
+  ];
+
+  const insight_text = `AI MARKET INSIGHT FOR ${sym}:
+The ${model} ensemble model forecasts an expected movement of ${change_pct >= 0 ? '+' : ''}${change_pct}% over the next ${horizon} horizon to approximately $${pred_price.toLocaleString()}.
+The 95% confidence interval spans between $${lower_bound.toLocaleString()} and $${upper_bound.toLocaleString()}. Model cross-validation on out-of-sample test data yields a composite R² score of ${confidence_pct / 100}.`;
+
   return {
-    symbol: symbol.toUpperCase(),
+    symbol: sym,
     horizon,
     selected_model: model,
     current_price: current,
-    predicted_price: target,
-    expected_change_pct: 7.4,
-    confidence_pct: 88.5,
-    lower_bound: Math.round(current * 0.98 * 100) / 100,
-    upper_bound: Math.round(current * 1.15 * 100) / 100,
-    forecast_points: [
-      { timestamp: 'Historical', actual_price: current * 0.94 },
-      { timestamp: 'Today', actual_price: current, predicted_price: current },
-      { timestamp: 'Forecast Target', predicted_price: target, lower_bound: current * 0.98, upper_bound: current * 1.15 }
-    ],
-    model_metrics: [
-      { model_name: 'Random Forest', rmse: 142.5, mae: 108.2, r2_score: 0.912, is_best: true },
-      { model_name: 'XGBoost', rmse: 156.8, mae: 119.4, r2_score: 0.895, is_best: false },
-      { model_name: 'LSTM / Neural Net', rmse: 172.1, mae: 135.0, r2_score: 0.868, is_best: false }
-    ],
-    ai_insight_text: `AI MARKET INSIGHT FOR ${symbol.toUpperCase()}: The ${model} model forecasts an upward movement of +7.40% over the next ${horizon} horizon to approximately $${target.toLocaleString()}. Model validation yields an R² score of 0.912.`
+    predicted_price: pred_price,
+    expected_change_pct: change_pct,
+    confidence_pct,
+    lower_bound,
+    upper_bound,
+    forecast_points,
+    model_metrics,
+    ai_insight_text: insight_text
   };
 };
+
 
 export const fallbackWhales: WhaleTransaction[] = [
   {
